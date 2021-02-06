@@ -1,0 +1,95 @@
+---
+title: "TidyTemplate"
+date: 2021-02-05
+output: html_output
+editor_options: 
+  chunk_output_type: console
+---
+
+# TidyTuesday
+
+Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
+Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
+While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
+The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
+As such we encourage everyone of all skills to participate!
+
+```{r setup, include=FALSE}
+
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+theme_set(theme_light())
+```
+
+# Load the weekly Data
+
+Dowload the weekly data and make available in the `tt` object.
+
+```{r Load}
+
+tt <- tt_load("2021-02-02")
+
+```
+
+
+# Readme
+
+Take a look at the readme for the weekly data to get insight on the dataset.
+This includes a data dictionary, source, and a link to an article on the data.
+
+```{r Readme, eval = interactive()}
+
+hbcu_long <- tt$hbcu_all %>% 
+  gather(matric, enrolment, -Year) %>% 
+  rename(year = Year)
+
+tt$hbcu_all %>% 
+  pivot_longer(cols =  -Year, 
+               names_to = "matric", 
+               values_to = "value")
+
+
+hbcu_long %>% 
+  filter(str_detect(matric, " - ")) %>% 
+  separate(matric, c("degree_length", "type"), sep = " - ") %>% 
+  filter(degree_length != "Total") %>% 
+  #count(degree_length, sort = TRUE)
+  ggplot(aes(year, enrolment, color = type))+
+  geom_line()+
+  facet_wrap(~ degree_length)+
+  labs(y = "# enrolled in HBCU",
+       color = " ")
+  
+
+hbcu_long %>% 
+  filter(matric %in% c("Males","Females")) %>% 
+  ggplot(aes(year, enrolment, color = matric))+
+  geom_line()+
+  expand_limits(y=0)+
+  labs(y = "# enrolled in HBCU")
+
+tt$hbcu_black
+
+hbcu_blong <- tt$hbcu_black %>% 
+  gather(matric, black_enrolment, -Year) %>% 
+  rename(year = Year)
+
+hbcu_compare_long <- hbcu_long %>% 
+  full_join(hbcu_blong, by = c("year","matric")) %>% 
+  mutate(pct_black = black_enrolment / enrolment) 
+
+hbcu_compare_long %>% 
+  filter(matric %in% c("Males", "Females" )) %>% 
+  ggplot(aes(year, pct_black, color = matric)) +
+  geom_line()+
+  scale_y_continuous(labels = percent)+
+  expand_limits(y=0)+
+  labs(y = "# of HBCU enrollment that is black")
+
+
+
+
+```
