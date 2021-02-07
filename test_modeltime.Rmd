@@ -1,0 +1,44 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(tidymodels)
+library(modeltime)
+library(lubridate)
+library(timetk)
+
+```
+
+# Examples - modeltime_accuracy
+```{r}
+m750 <- m4_monthly %>% filter(id == "M750")
+
+# Split Data 80/20
+splits <- initial_time_split(m750, prop = 0.9)
+
+# --- MODELS ---
+
+# Model 1: auto_arima ----
+model_fit_arima <- arima_reg() %>%
+    set_engine(engine = "auto_arima") %>%
+    fit(value ~ date, data = training(splits))
+
+
+# ---- MODELTIME TABLE ----
+
+models_tbl <- modeltime_table(
+    model_fit_arima
+)
+
+# ---- ACCURACY ----
+
+models_tbl %>%
+    modeltime_calibrate(new_data = testing(splits)) %>%
+    modeltime_accuracy(
+        metric_set = metric_set(mae, rmse, rsq)
+    )
+```
+
