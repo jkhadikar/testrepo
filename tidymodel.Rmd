@@ -1,0 +1,144 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+```{r}
+library(tidyverse)
+library(tidymodels)
+library()
+
+```
+
+
+```{r}
+df <- diamonds %>% 
+  filter(x > 0, y > 0, z > 0) %>% 
+  filter(y < 20, z < 10) %>% 
+  filter(carat <= quantile(.$carat, probs = 0.99)) %>% 
+  mutate(
+    color = fct_rev(color),
+    color_combined = fct_collapse(color, "DEFG" = c("D", "E", "F", "G"))
+  )
+df
+```
+
+```{r}
+
+df <-
+  df %>% 
+  mutate(
+    log2_price = log2(price),
+    log2_carat = log2(carat)
+  )
+
+```
+
+```{r}
+lm_spec <-
+  linear_reg() %>% 
+  set_engine(engine = "lm")
+
+
+stan_spec <-
+  linear_reg() %>% 
+  set_engine(engine = "stan")
+```
+
+```{r}
+lm_fit <- 
+  lm_spec %>% 
+  fit(formula = log2_price ~ log2_carat, data = df)
+
+lm_fit
+```
+
+```{r}
+typeof(lm_fit)
+names(lm_fit)
+```
+
+
+```{r}
+names(lm_fit$fit)
+```
+
+```{r}
+summary(lm_fit$fit)
+```
+
+```{r}
+lm_fit$fit$coefficients
+```
+
+```{r}
+coef(lm_fit$fit)
+```
+
+```{r}
+coef(lm_fit$fit)[["(Intercept)"]]
+```
+
+```{r}
+df_lm <-
+  df %>% 
+  modelr::add_predictions(lm_fit$fit) %>% 
+  modelr::add_residuals(lm_fit$fit)
+
+df_lm %>% 
+  select(log2_carat, log2_price, pred, resid)
+```
+
+```{r}
+df_lm %>% 
+  ggplot(aes(log2_carat)) +
+  geom_hex(aes(y = log2_price), alpha = 0.9) +
+  geom_line(aes(y = pred), color = "blue", size = 1) +
+  scale_fill_viridis_c() 
+```
+
+
+```{r}
+
+df_lm %>% 
+  ggplot(aes(carat, resid)) +
+  geom_hex(alpha = 0.9) +
+  geom_hline(yintercept = 0, color = "white", size = 1) +
+  geom_smooth() + 
+  scale_fill_viridis_c()
+
+```
+
+```{r}
+
+df_lm %>% 
+  yardstick::rmse(truth = log2_price, estimate = pred)
+
+```
+
+
+```{r}
+# Specify model
+lm_spec <-
+  linear_reg() %>% 
+  set_engine(engine = "lm")
+
+# Fit model
+lm_fit <-
+  lm_spec %>% 
+  fit(formula = log2_price ~ log2_carat, data = df)
+
+# Add predictions and residuals
+df_lm <-
+  df %>% 
+  modelr::add_predictions(model = lm_fit$fit) %>% 
+  modelr::add_residuals(model = lm_fit$fit)
+
+# Calculate error
+lm_rmse <-
+  df_lm %>% 
+  yardstick::rmse(truth = log2_price, estimate = pred)
+
+lm_rmse
+```

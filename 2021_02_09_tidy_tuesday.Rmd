@@ -4,13 +4,7 @@ date: 2021-02-11
 output: html_output
 ---
 
-# TidyTuesday
 
-Join the R4DS Online Learning Community in the weekly #TidyTuesday event!
-Every week we post a raw dataset, a chart or article related to that dataset, and ask you to explore the data.
-While the dataset will be “tamed”, it will not always be tidy! As such you might need to apply various R for Data Science techniques to wrangle the data into a true tidy format.
-The goal of TidyTuesday is to apply your R skills, get feedback, explore other’s work, and connect with the greater #RStats community!
-As such we encourage everyone of all skills to participate!
 
 ```{r setup, include=FALSE}
 
@@ -19,72 +13,264 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(tidytuesdayR)
 
+# Helper packages
+library(dplyr)         # for basic data wrangling
+
+# Modeling packages
+library(keras)         # for fitting DNNs
+library(tfruns)        # for additional grid search & model training functions
+
+# Modeling helper package - not necessary for reproducibility
+library(tfestimators)  # provides grid search & model training interface
 ```
 
-# Load the weekly Data
-
-Dowload the weekly data and make available in the `tt` object.
 
 ```{r Load}
+# Import MNIST training data
+mnist <- dslabs::read_mnist()
+mnist_x <- mnist$train$images
+mnist_y <- mnist$train$labels
 
-tt <- tt_load("2021-02-09")
+# Rename columns and standardize feature values
+colnames(mnist_x) <- paste0("V", 1:ncol(mnist_x))
+mnist_x <- mnist_x / 255
 
-```
-
-
-# Readme
-
-Take a look at the readme for the weekly data to get insight on the dataset.
-This includes a data dictionary, source, and a link to an article on the data.
-
-```{r Readme, eval = interactive()}
-
-tt
+# One-hot encode response
+mnist_y <- to_categorical(mnist_y, 10)
 
 ```
-
-
-# Glimpse Data
-
-Take an initial look at the format of the data available.
-
-```{r Glimpse}
-
-tt %>% 
-  map(glimpse)
-
-```
-
-# Wrangle
-
-Explore the data and process it into a nice format for plotting! Access each dataset by name by using a dollarsign after the `tt` object and then the name of the data set.
-
-```{r Wrangle}
-
-
-
-```
-
-
-# Visualize
-
-Using your processed dataset, create your unique visualization.
-
-```{r Visualize}
-
-
-  
-```
-
-# Save Image
-
-Save your image for sharing. Be sure to use the `#TidyTuesday` hashtag in your post on twitter! 
 
 ```{r}
+model <- keras_model_sequential() %>%
+  layer_dense(units = 128, input_shape = ncol(mnist_x)) %>%
+  layer_dense(units = 64) %>%
+  layer_dense(units = 10)
+```
 
-# This will save your most recent plot
-ggsave(
-  filename = "My TidyTuesday Plot.png",
-  device = "png")
+```{r}
+model <- keras_model_sequential() %>%
+  layer_dense(units = 128, activation = "relu", input_shape = p) %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 10, activation = "softmax")
 
 ```
+
+```{r}
+model <- keras_model_sequential() %>%
+  
+  # Network architecture
+  layer_dense(units = 128, activation = "relu", input_shape = ncol(mnist_x)) %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dense(units = 10, activation = "softmax") %>%
+  
+  # Backpropagation
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_rmsprop(),
+    metrics = c('accuracy')
+  )
+```
+```{r}
+# Train the model
+fit1 <- model %>%
+  fit(
+    x = mnist_x,
+    y = mnist_y,
+    epochs = 25,
+    batch_size = 128,
+    validation_split = 0.2,
+    verbose = FALSE
+  )
+
+# Display output
+fit1
+## Trained on 48,000 samples, validated on 12,000 samples (batch_size=128, epochs=25)
+## Final epoch (plot to see history):
+## val_loss: 0.1512
+##  val_acc: 0.9773
+##     loss: 0.002308
+##      acc: 0.9994
+plot(fit1)
+```
+
+```{r}
+model_w_norm <- keras_model_sequential() %>%
+  
+  # Network architecture with batch normalization
+  layer_dense(units = 256, activation = "relu", input_shape = ncol(mnist_x)) %>%
+  layer_batch_normalization() %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dense(units = 10, activation = "softmax") %>%
+
+  # Backpropagation
+  compile(
+    loss = "categorical_crossentropy",
+    optimizer = optimizer_rmsprop(),
+    metrics = c("accuracy")
+  )
+```
+```{r}
+model_w_reg <- keras_model_sequential() %>%
+  
+  # Network architecture with L1 regularization and batch normalization
+  layer_dense(units = 256, activation = "relu", input_shape = ncol(mnist_x),
+              kernel_regularizer = regularizer_l2(0.001)) %>%
+  layer_batch_normalization() %>%
+  layer_dense(units = 128, activation = "relu", 
+              kernel_regularizer = regularizer_l2(0.001)) %>%
+  layer_batch_normalization() %>%
+  layer_dense(units = 64, activation = "relu", 
+              kernel_regularizer = regularizer_l2(0.001)) %>%
+  layer_batch_normalization() %>%
+  layer_dense(units = 10, activation = "softmax") %>%
+
+  # Backpropagation
+  compile(
+    loss = "categorical_crossentropy",
+    optimizer = optimizer_rmsprop(),
+    metrics = c("accuracy")
+  )
+```
+
+
+```{r}
+model_w_drop <- keras_model_sequential() %>%
+  
+  # Network architecture with 20% dropout
+  layer_dense(units = 256, activation = "relu", input_shape = ncol(mnist_x)) %>%
+  layer_dropout(rate = 0.2) %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_dropout(rate = 0.2) %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_dropout(rate = 0.2) %>%
+  layer_dense(units = 10, activation = "softmax") %>%
+
+  # Backpropagation
+  compile(
+    loss = "categorical_crossentropy",
+    optimizer = optimizer_rmsprop(),
+    metrics = c("accuracy")
+  )
+```
+```{r}
+model_w_adj_lrn <- keras_model_sequential() %>%
+  layer_dense(units = 256, activation = "relu", input_shape = ncol(mnist_x)) %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = 0.4) %>%
+  layer_dense(units = 128, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = 64, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = 0.2) %>%
+  layer_dense(units = 10, activation = "softmax") %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    optimizer = optimizer_adam(),
+    metrics = c('accuracy')
+  ) %>%
+  fit(
+    x = mnist_x,
+    y = mnist_y,
+    epochs = 35,
+    batch_size = 128,
+    validation_split = 0.2,
+    callbacks = list(
+      callback_early_stopping(patience = 5),
+      callback_reduce_lr_on_plateau(factor = 0.05)
+      ),
+    verbose = FALSE
+  )
+
+model_w_adj_lrn
+## Trained on 48,000 samples, validated on 12,000 samples (batch_size=128, epochs=20)
+## Final epoch (plot to see history):
+## val_loss: 0.07223
+##  val_acc: 0.9808
+##     loss: 0.05366
+##      acc: 0.9832
+##       lr: 0.001
+
+# Optimal
+min(model_w_adj_lrn$metrics$val_loss)
+## [1] 0.0699492
+max(model_w_adj_lrn$metrics$val_acc)
+## [1] 0.981
+
+# Learning rate
+plot(model_w_adj_lrn)
+```
+
+```{r}
+FLAGS <- flags(
+  # Nodes
+  flag_numeric("nodes1", 256),
+  flag_numeric("nodes2", 128),
+  flag_numeric("nodes3", 64),
+  # Dropout
+  flag_numeric("dropout1", 0.4),
+  flag_numeric("dropout2", 0.3),
+  flag_numeric("dropout3", 0.2),
+  # Learning paramaters
+  flag_string("optimizer", "rmsprop"),
+  flag_numeric("lr_annealing", 0.1)
+)
+```
+
+
+
+```{r}
+model <- keras_model_sequential() %>%
+  layer_dense(units = FLAGS$nodes1, activation = "relu", input_shape = ncol(mnist_x)) %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = FLAGS$dropout1) %>%
+  layer_dense(units = FLAGS$nodes2, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = FLAGS$dropout2) %>%
+  layer_dense(units = FLAGS$nodes3, activation = "relu") %>%
+  layer_batch_normalization() %>%
+  layer_dropout(rate = FLAGS$dropout3) %>%
+  layer_dense(units = 10, activation = "softmax") %>%
+  compile(
+    loss = 'categorical_crossentropy',
+    metrics = c('accuracy'),
+    optimizer = FLAGS$optimizer
+  ) %>%
+  fit(
+    x = mnist_x,
+    y = mnist_y,
+    epochs = 35,
+    batch_size = 128,
+    validation_split = 0.2,
+    callbacks = list(
+      callback_early_stopping(patience = 5),
+      callback_reduce_lr_on_plateau(factor = FLAGS$lr_annealing)
+    ),
+    verbose = FALSE
+  )
+```
+
+```{r}
+# Run various combinations of dropout1 and dropout2
+runs <- tuning_run("scripts/mnist-grid-search.R", 
+  flags = list(
+    nodes1 = c(64, 128, 256),
+    nodes2 = c(64, 128, 256),
+    nodes3 = c(64, 128, 256),
+    dropout1 = c(0.2, 0.3, 0.4),
+    dropout2 = c(0.2, 0.3, 0.4),
+    dropout3 = c(0.2, 0.3, 0.4),
+    optimizer = c("rmsprop", "adam"),
+    lr_annealing = c(0.1, 0.05)
+  ),
+  sample = 0.05
+)
+
+runs %>% 
+  filter(metric_val_loss == min(metric_val_loss)) %>% 
+  glimpse()
+```
+
